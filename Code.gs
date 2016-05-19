@@ -34,6 +34,9 @@ Date.prototype.yyyymmdd = function() {
 var RUN_DATE = new Date().yyyymmdd();
 var EMAIL_RECIPIENT = Session.getActiveUser().getEmail();
 var EMAIL_SUBJECT = 'Found emails marked for expiration on ' + RUN_DATE;
+var EXPIRATION_LABEL_PREFIX = 'expires';
+var EXPIRATION_LABEL_DATE_START_INDEX = EXPIRATION_LABEL_PREFIX.length + 1;
+var DELETE_LABEL_NAME = 'DELETE';
 
 
 
@@ -42,17 +45,90 @@ var EMAIL_SUBJECT = 'Found emails marked for expiration on ' + RUN_DATE;
  * MAIN
  */
 function main() {
-  Logger.log('Running...');
 
-  sendEmail('test');
+  
+  var gmailLabels = GmailApp.getUserLabels();
 
-  Logger.log('Complete!');
+  var expirationLabels = gmailLabels.filter(isExpirationLabel);
+
+  if (expirationLabels.length > 0) {    
+    var expirationDateMatchLabels = expirationLabels.filter(isExpirationDateMatch);
+    
+    if (expirationDateMatchLabels.length == 1) {
+      var expirationDateMatchLabel = expirationDateMatchLabels[0];
+      markThreadsForDeletion(expirationDateMatchLabel);
+    }
+    
+    deleteEmptyExpirationLabels(expirationLabels);
+    deleteEmptyDeleteLabel();
+  }
 }
 
 
 /**
- * Sends parameter body as email
+ * Returns true if the parameter label should be evaluated as having threads
+ * that should be deleted
  */
-function sendEmail(body) {
-  MailApp.sendEmail(EMAIL_RECIPIENT, EMAIL_SUBJECT, body);
+function isExpirationLabel(gmailLabel) {
+  return gmailLabel.getName().toLowerCase().startsWith(EXPIRATION_LABEL_PREFIX);
+}
+
+
+/**
+ * Returns true if the date on the parameter label matches the run date
+ */
+function isExpirationDateMatch(gmailLabel) {
+  var expirationDate = gmailLabel.getName().substring(EXPIRATION_LABEL_DATE_START_INDEX);
+  return expirationDate == RUN_DATE;
+}
+
+
+/**
+ * Marks all threads attached to the parameter label with the deletion label
+ */
+function markThreadsForDeletion(gmailLabel) {
+  var deleteLabel = retrieveDeleteLabel();
+  
+  gmailLabel.getThreads().forEach(function(gmailThread) {
+    gmailThread.addLabel(deleteLabel);
+    gmailThread.moveToInbox();
+  });
+}
+
+
+/**
+ * Returns the delete label. Creates the label if it doesn't exist.
+ */
+function retrieveDeleteLabel() {
+  var deleteLabel = GmailApp.getUserLabelByName(DELETE_LABEL_NAME);
+  
+  if (!deleteLabel) {
+    deleteLabel = GmailApp.createLabel(DELETE_LABEL_NAME);
+  }
+  
+  return deleteLabel;
+}
+
+
+/**
+ * Deletes any of the parameter labels that don't have attached threads
+ */
+function deleteEmptyExpirationLabels(gmailLabels) {
+  gmailLabels.forEach(function(gmailLabel) {
+    if (gmailLabel.getThreads().length == 0) {
+      gmailLabel.deleteLabel();
+    }
+  });
+}
+
+
+/**
+ * Deletes the delete label if 
+ */
+function deleteEmptyDeleteLabel() {
+  var deleteLabel = GmailApp.getUserLabelByName(DELETE_LABEL_NAME);
+  
+  if (deleteLabel && deleteLabel.getThreads().length == 0) {
+    deleteLabel.deleteLabel();
+  }
 }
