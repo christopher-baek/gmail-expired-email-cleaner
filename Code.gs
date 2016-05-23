@@ -46,23 +46,28 @@ var DELETE_LABEL_NAME = 'DELETE';
  * MAIN
  */
 function main() {
-
+  Logger.log("Starting...");
   
   var gmailLabels = GmailApp.getUserLabels();
 
   var expirationLabels = gmailLabels.filter(isExpirationLabel);
+  Logger.log("Found %s expiration labels", expirationLabels.length);
 
-  if (expirationLabels.length > 0) {    
+  if (expirationLabels.length > 0) {
     var expirationDateMatchLabels = expirationLabels.filter(isExpirationDateMatch);
-    
+
     if (expirationDateMatchLabels.length == 1) {
+      Logger.log("Found expiration label match for %s", RUN_DATE);
+      
       var expirationDateMatchLabel = expirationDateMatchLabels[0];
       markThreadsForDeletion(expirationDateMatchLabel);
     }
-    
+
     deleteEmptyExpirationLabels(expirationLabels);
     deleteEmptyDeleteLabel();
   }
+  
+  Logger.log("Done!");
 }
 
 
@@ -80,7 +85,7 @@ function isExpirationLabel(gmailLabel) {
  */
 function isExpirationDateMatch(gmailLabel) {
   var expirationDate = gmailLabel.getName().substring(EXPIRATION_LABEL_DATE_START_INDEX);
-  return expirationDate == RUN_DATE;
+  return expirationDate === RUN_DATE;
 }
 
 
@@ -89,10 +94,9 @@ function isExpirationDateMatch(gmailLabel) {
  */
 function markThreadsForDeletion(gmailLabel) {
   var deleteLabel = retrieveDeleteLabel();
-  
+
   gmailLabel.getThreads().forEach(function(gmailThread) {
     gmailThread.addLabel(deleteLabel);
-    gmailThread.moveToInbox();
   });
 }
 
@@ -102,11 +106,11 @@ function markThreadsForDeletion(gmailLabel) {
  */
 function retrieveDeleteLabel() {
   var deleteLabel = GmailApp.getUserLabelByName(DELETE_LABEL_NAME);
-  
+
   if (!deleteLabel) {
     deleteLabel = GmailApp.createLabel(DELETE_LABEL_NAME);
   }
-  
+
   return deleteLabel;
 }
 
@@ -124,11 +128,11 @@ function deleteEmptyExpirationLabels(gmailLabels) {
 
 
 /**
- * Deletes the delete label if 
+ * Deletes the delete label if
  */
 function deleteEmptyDeleteLabel() {
   var deleteLabel = GmailApp.getUserLabelByName(DELETE_LABEL_NAME);
-  
+
   if (deleteLabel && deleteLabel.getThreads().length == 0) {
     deleteLabel.deleteLabel();
   }
